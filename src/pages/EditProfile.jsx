@@ -8,11 +8,17 @@ const EditProfile = () => {
         correo: '',
         telefono: ''
     });
+
+    const [avatarFile, setAvatarFile] = useState(null);
+    const [previewUrl, setPreviewUrl] = useState(null);
+    const [avatarActual, setAvatarActual] = useState(null); 
+
     const [mensaje, setMensaje] = useState({ tipo: '', texto: '' });
     const [cargando, setCargando] = useState(false);
 
     useEffect(() => {
-        const usuarioGuardado = JSON.parse(localStorage.getItem('usuarioLogueado'));
+        // 🔍 Unificamos la llave para buscar en localStorage de forma segura
+        const usuarioGuardado = JSON.parse(localStorage.getItem('usuarioLogueado') || localStorage.getItem('usuariologueado'));
         if (usuarioGuardado) {
             setFormData({
                 nombre: usuarioGuardado.nombre || '',
@@ -20,6 +26,10 @@ const EditProfile = () => {
                 correo: usuarioGuardado.correo || '',
                 telefono: usuarioGuardado.telefono || ''
             });
+            // 📸 Leemos 'foto' tal como viene de tu base de datos y backend
+            if (usuarioGuardado.foto) {
+                setAvatarActual(usuarioGuardado.foto);
+            }
         }
     }, []);
 
@@ -30,18 +40,51 @@ const EditProfile = () => {
         });
     };
 
+    const handleFileChange = (e) => {
+        const file = e.target.files[0];
+        if (file) {
+            setAvatarFile(file);
+            setPreviewUrl(URL.createObjectURL(file)); 
+        }
+    };
+
     const handleSubmit = async (e) => {
         e.preventDefault();
         setCargando(true);
         setMensaje({ tipo: '', texto: '' });
 
         try {
-            const response = await api.put('/usuarios/perfil', formData);
+            const dataToSend = new FormData();
+            dataToSend.append('nombre', formData.nombre);
+            dataToSend.append('apellidos', formData.apellidos);
+            dataToSend.append('correo', formData.correo);
+            dataToSend.append('telefono', formData.telefono);
+
+            if (avatarFile) {
+                // 📸 CORREGIDO: Cambiado de 'avatar' a 'foto' para que coincida con el backend
+                dataToSend.append('foto', avatarFile);
+            }
+
+            const response = await api.put('/usuarios/perfil', dataToSend);
 
             if (response.data.status === 'success') {
-                setMensaje({ tipo: 'exito', texto: '¡Información de perfil actualizada correctamente!' });
-                localStorage.setItem('usuarioLogueado', JSON.stringify(response.data.usuario));
-                localStorage.setItem('userName', response.data.usuario.nombre);
+                setMensaje({ tipo: 'exito', texto: '¡Información y foto de perfil actualizadas correctamente!' });
+                
+                // Actualizamos ambas variantes en el localStorage para evitar conflictos con el Navbar
+                const usuarioActualizado = response.data.usuario;
+                localStorage.setItem('usuarioLogueado', JSON.stringify(usuarioActualizado));
+                localStorage.setItem('usuariologueado', JSON.stringify(usuarioActualizado));
+                localStorage.setItem('userName', usuarioActualizado.nombre);
+                
+                if (usuarioActualizado.foto) {
+                    setAvatarActual(usuarioActualizado.foto);
+                }
+                setAvatarFile(null); 
+
+                // 🔄 Recargamos la página automáticamente para que el Navbar pinte la nueva foto al instante
+                setTimeout(() => {
+                    window.location.reload();
+                }, 1200);
             }
         } catch (error) {
             console.error("Error al guardar perfil:", error);
@@ -67,15 +110,20 @@ const EditProfile = () => {
                 {/* Header de la tarjeta */}
                 <div style={styles.header}>
                     <div style={styles.avatarContainer}>
-                        <div style={styles.avatar}>
-                            {obtenerIniciales()}
+                        <div style={{
+                            ...styles.avatar,
+                            backgroundImage: (previewUrl || avatarActual) ? `url(${previewUrl || avatarActual})` : 'none',
+                            backgroundSize: 'cover',
+                            backgroundPosition: 'center'
+                        }}>
+                            {(!previewUrl && !avatarActual) && obtenerIniciales()}
                         </div>
                         <div style={styles.badgeOnline} />
                     </div>
                     <div style={styles.headerInfo}>
                         <div style={styles.tag}>CONFIGURACIÓN DE CUENTA</div>
                         <h1 style={styles.title}>Editar Perfil</h1>
-                        <p style={styles.subtitle}>Gestiona tus datos personales y formas de contacto de tu cuenta</p>
+                        <p style={styles.subtitle}>Gestiona tus datos personales y tu foto de perfil</p>
                     </div>
                 </div>
 
@@ -106,6 +154,26 @@ const EditProfile = () => {
                 <form onSubmit={handleSubmit}>
                     <div style={styles.grid}>
                         
+                        {/* Campo para seleccionar la nueva foto de perfil */}
+                        <div style={{ ...styles.inputGroup, gridColumn: '1 / -1' }}>
+                            <label style={styles.label}>Cambiar Foto de Perfil</label>
+                            <div style={styles.inputWrapper}>
+                                <input
+                                    type="file"
+                                    accept="image/*"
+                                    onChange={handleFileChange}
+                                    style={{
+                                        ...styles.input,
+                                        padding: '10px 14px',
+                                        cursor: 'pointer'
+                                    }}
+                                />
+                            </div>
+                            <span style={{ fontSize: '12px', color: '#64748B', marginTop: '6px' }}>
+                                Selecciona una imagen en formato PNG, JPG o WEBP.
+                            </span>
+                        </div>
+
                         {/* Campo Nombre */}
                         <div style={styles.inputGroup}>
                             <label style={styles.label}>Nombres</label>
@@ -219,7 +287,7 @@ const styles = {
     card: {
         backgroundColor: '#FFFFFF',
         width: '100%',
-        maxWidth: '880px', // Agrandado para mayor amplitud visual
+        maxWidth: '880px',
         borderRadius: '20px',
         boxShadow: '0 20px 40px -15px rgba(15, 23, 42, 0.08), 0 0 1px 1px rgba(15, 23, 42, 0.05)',
         padding: '48px',
@@ -300,7 +368,7 @@ const styles = {
     },
     grid: {
         display: 'grid',
-        gridTemplateColumns: 'repeat(2, 1fr)', // 2 columnas fijas y ordenadas
+        gridTemplateColumns: 'repeat(2, 1fr)',
         gap: '28px 24px'
     },
     inputGroup: {
@@ -329,7 +397,7 @@ const styles = {
     },
     input: {
         width: '100%',
-        padding: '14px 16px 14px 48px', // Espacio para el ícono a la izquierda
+        padding: '14px 16px 14px 48px',
         borderRadius: '12px',
         border: '1.5px solid #CBD5E1',
         fontSize: '15px',

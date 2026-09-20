@@ -14,7 +14,8 @@ const Navbar = () => {
 
   const userName = localStorage.getItem('userName');
   const userRole = localStorage.getItem('userRole');
-
+  const usuarioGuardado = JSON.parse(localStorage.getItem('usuariologueado'));
+  const userAvatar = usuarioGuardado?.foto; 
   const handleLogout = () => {
     localStorage.clear();
     navigate('/login');
@@ -29,7 +30,6 @@ const Navbar = () => {
       }
 
       setCargando(true);
-      // Aumentamos el límite a 8 para que salgan más productos en la lista desplegable
       const { data, error } = await supabase
         .from('producto')
         .select('idproducto, nombre_producto, precio, imagenes')
@@ -154,8 +154,19 @@ const Navbar = () => {
           <Link className="text-decoration-none text-dark fs-5" to="/carrito"><i className="bi bi-cart3"></i></Link>
 
           <div className="dropdown">
-            <button className="btn p-0" type="button" data-bs-toggle="dropdown" aria-expanded="false">
-              <i className="bi bi-person-circle fs-4"></i>
+            <button className="btn p-0 d-flex align-items-center" type="button" data-bs-toggle="dropdown" aria-expanded="false">
+              {userAvatar ? (
+                // Si hay foto de perfil, mostramos la imagen en miniatura redonda estilo web moderna
+                <img 
+                  src={userAvatar} 
+                  alt="Avatar" 
+                  className="rounded-circle" 
+                  style={{ width: '34px', height: '34px', objectFit: 'cover' }} 
+                />
+              ) : (
+                // Si no hay foto, mostramos el icono por defecto de Bootstrap
+                <i className="bi bi-person-circle fs-4"></i>
+              )}
             </button>
             <ul className="dropdown-menu dropdown-menu-end">
               {userName ? (
