@@ -1,9 +1,58 @@
-import React from 'react';
+import React, { useState } from 'react';
 
 const Contact = ({ cambiarVista }) => {
+  // Estado para capturar los datos del formulario
+  const [formData, setFormData] = useState({
+    nombres: '',
+    correo: '',
+    telefono: '',
+    asunto: ''
+  });
+
+  // Estado para controlar el indicador de carga del botón
+  const [cargando, setCargando] = useState(false);
+
+  // Función para actualizar los valores conforme el usuario escribe
+  const handleChange = (e) => {
+    setFormData({
+      ...formData,
+      [e.target.name]: e.target.value
+    });
+  };
+
+  // Función que se ejecuta al presionar "Enviar mensaje"
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    setCargando(true);
+
+    try {
+      const response = await fetch('http://localhost:3001/api/contacto', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(formData)
+      });
+
+      const data = await response.json();
+
+      if (response.ok) {
+        alert('¡Mensaje enviado con éxito! Nos pondremos en contacto pronto.');
+        // Limpiamos el formulario después de enviar
+        setFormData({ nombres: '', correo: '', telefono: '', asunto: '' });
+      } else {
+        alert(data.message || 'Hubo un error al enviar el mensaje.');
+      }
+    } catch (error) {
+      console.error('Error de red:', error);
+      alert('No se pudo conectar con el servidor. Revisa si el backend está encendido.');
+    } finally {
+      setCargando(false);
+    }
+  };
+
   return (
     <div className="container-fluid p-0">
-      
       <div className="container my-5">
         <h1 className="text-center fw-bold mb-5">Contáctenos</h1>
         
@@ -11,24 +60,62 @@ const Contact = ({ cambiarVista }) => {
           {/* Columna Izquierda: Formulario */}
           <div className="col-md-6">
             <h4 className="fw-bold mb-4">Con gusto atenderemos tu solicitud</h4>
-            <form>
+            
+            <form onSubmit={handleSubmit}>
               <div className="mb-3">
                 <label className="form-label">Nombres:</label>
-                <input type="text" className="form-control bg-light" />
+                <input 
+                  type="text" 
+                  name="nombres"
+                  value={formData.nombres}
+                  onChange={handleChange}
+                  className="form-control bg-light" 
+                  required 
+                />
               </div>
+
               <div className="mb-3">
                 <label className="form-label">Correo electrónico:</label>
-                <input type="email" className="form-control bg-light" />
+                <input 
+                  type="email" 
+                  name="correo"
+                  value={formData.correo}
+                  onChange={handleChange}
+                  className="form-control bg-light" 
+                  required 
+                />
               </div>
+
               <div className="mb-3">
                 <label className="form-label">Teléfono de contacto:</label>
-                <input type="tel" className="form-control bg-light" />
+                <input 
+                  type="tel" 
+                  name="telefono"
+                  value={formData.telefono}
+                  onChange={handleChange}
+                  className="form-control bg-light" 
+                />
               </div>
+
               <div className="mb-4">
                 <label className="form-label">Asunto:</label>
-                <textarea className="form-control bg-light" rows="3"></textarea>
+                <textarea 
+                  name="asunto"
+                  value={formData.asunto}
+                  onChange={handleChange}
+                  className="form-control bg-light" 
+                  rows="3" 
+                  required
+                ></textarea>
               </div>
-              <button type="submit" className="btn btn-dark px-4 py-2 fw-bold">Enviar mensaje</button>
+
+              <button 
+                type="submit" 
+                className="btn btn-dark px-4 py-2 fw-bold"
+                disabled={cargando}
+              >
+                {cargando ? 'Enviando...' : 'Enviar mensaje'}
+              </button>
             </form>
           </div>
 
