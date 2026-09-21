@@ -14,8 +14,20 @@ const Navbar = () => {
 
   const userName = localStorage.getItem('userName');
   const userRole = localStorage.getItem('userRole');
-  const usuarioGuardado = JSON.parse(localStorage.getItem('usuariologueado'));
-  const userAvatar = usuarioGuardado?.foto; 
+  
+  // Obtenemos el usuario de manera segura comprobando las variantes de la llave
+  const usuarioGuardado = JSON.parse(
+    localStorage.getItem('usuariologueado') || localStorage.getItem('usuarioLogueado') || '{}'
+  );
+
+  // URL base de tu backend (ajusta el puerto si tu servidor corre en otro diferente)
+  const backendUrl = 'http://localhost:4000'; 
+
+  // Construimos la URL completa del avatar si existe la propiedad 'foto'
+  const userAvatar = usuarioGuardado?.foto 
+    ? (usuarioGuardado.foto.startsWith('http') ? usuarioGuardado.foto : `${backendUrl}${usuarioGuardado.foto}`)
+    : null;
+
   const handleLogout = () => {
     localStorage.clear();
     navigate('/login');
@@ -156,7 +168,6 @@ const Navbar = () => {
           <div className="dropdown">
             <button className="btn p-0 d-flex align-items-center" type="button" data-bs-toggle="dropdown" aria-expanded="false">
               {userAvatar ? (
-                // Si hay foto de perfil, mostramos la imagen en miniatura redonda estilo web moderna
                 <img 
                   src={userAvatar} 
                   alt="Avatar" 
@@ -164,7 +175,6 @@ const Navbar = () => {
                   style={{ width: '34px', height: '34px', objectFit: 'cover' }} 
                 />
               ) : (
-                // Si no hay foto, mostramos el icono por defecto de Bootstrap
                 <i className="bi bi-person-circle fs-4"></i>
               )}
             </button>
