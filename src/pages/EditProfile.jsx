@@ -6,7 +6,11 @@ const EditProfile = () => {
         nombre: '',
         apellidos: '',
         correo: '',
-        telefono: ''
+        telefono: '',
+        // 🔒 Campos agregados para el cambio de contraseña
+        passwordActual: '',
+        passwordNueva: '',
+        passwordConfirmar: ''
     });
 
     const [avatarFile, setAvatarFile] = useState(null);
@@ -20,12 +24,13 @@ const EditProfile = () => {
         // 🔍 Unificamos la llave para buscar en localStorage de forma segura
         const usuarioGuardado = JSON.parse(localStorage.getItem('usuarioLogueado') || localStorage.getItem('usuariologueado'));
         if (usuarioGuardado) {
-            setFormData({
+            setFormData(prev => ({
+                ...prev,
                 nombre: usuarioGuardado.nombre || '',
                 apellidos: usuarioGuardado.apellidos || '',
                 correo: usuarioGuardado.correo || '',
                 telefono: usuarioGuardado.telefono || ''
-            });
+            }));
             // 📸 Leemos 'foto' tal como viene de tu base de datos y backend
             if (usuarioGuardado.foto) {
                 setAvatarActual(usuarioGuardado.foto);
@@ -50,15 +55,49 @@ const EditProfile = () => {
 
     const handleSubmit = async (e) => {
         e.preventDefault();
-        setCargando(true);
         setMensaje({ tipo: '', texto: '' });
 
+        // 🔒 Validación opcional previa en frontend si intenta cambiar la contraseña
+        if (formData.passwordNueva || formData.passwordActual || formData.passwordConfirmar) {
+            if (!formData.passwordActual || !formData.passwordNueva) {
+                setMensaje({
+                    tipo: 'error',
+                    texto: 'Para cambiar la contraseña debes ingresar tu contraseña actual y la nueva contraseña.'
+                });
+                return;
+            }
+            if (formData.passwordNueva !== formData.passwordConfirmar) {
+                setMensaje({
+                    tipo: 'error',
+                    texto: 'La nueva contraseña y la confirmación no coinciden.'
+                });
+                return;
+            }
+        }
+
+        setCargando(true);
+
         try {
+            // Obtenemos el ID del usuario del localStorage para enviarlo al backend
+            const usuarioGuardado = JSON.parse(localStorage.getItem('usuarioLogueado') || localStorage.getItem('usuariologueado'));
+            const idusuario = usuarioGuardado?.idusuario || usuarioGuardado?.id_usuario;
+
             const dataToSend = new FormData();
+            // 📌 ENVIAMOS EL ID DE USUARIO PARA QUE EL BACKEND SEPA A QUIÉN ACTUALIZAR
+            if (idusuario) {
+                dataToSend.append('idusuario', idusuario);
+            }
+
             dataToSend.append('nombre', formData.nombre);
             dataToSend.append('apellidos', formData.apellidos);
             dataToSend.append('correo', formData.correo);
             dataToSend.append('telefono', formData.telefono);
+
+            // Adjuntamos las contraseñas si el usuario decidió llenarlas
+            if (formData.passwordActual) {
+                dataToSend.append('passwordActual', formData.passwordActual);
+                dataToSend.append('passwordNueva', formData.passwordNueva);
+            }
 
             if (avatarFile) {
                 // 📸 CORREGIDO: Cambiado de 'avatar' a 'foto' para que coincida con el backend
@@ -68,7 +107,7 @@ const EditProfile = () => {
             const response = await api.put('/usuarios/perfil', dataToSend);
 
             if (response.data.status === 'success') {
-                setMensaje({ tipo: 'exito', texto: '¡Información y foto de perfil actualizadas correctamente!' });
+                setMensaje({ tipo: 'exito', texto: '¡Perfil y contraseña actualizados correctamente!' });
                 
                 // Actualizamos ambas variantes en el localStorage para evitar conflictos con el Navbar
                 const usuarioActualizado = response.data.usuario;
@@ -81,6 +120,14 @@ const EditProfile = () => {
                 }
                 setAvatarFile(null); 
 
+                // Limpiamos los campos de contraseña por seguridad
+                setFormData(prev => ({
+                    ...prev,
+                    passwordActual: '',
+                    passwordNueva: '',
+                    passwordConfirmar: ''
+                }));
+
                 // 🔄 Recargamos la página automáticamente para que el Navbar pinte la nueva foto al instante
                 setTimeout(() => {
                     window.location.reload();
@@ -90,7 +137,7 @@ const EditProfile = () => {
             console.error("Error al guardar perfil:", error);
             setMensaje({
                 tipo: 'error',
-                texto: error.response?.data?.message || 'Error al actualizar el perfil'
+                texto: error.response?.data?.message || 'Error al actualizar el perfil o la contraseña'
             });
         } finally {
             setCargando(false);
@@ -123,7 +170,7 @@ const EditProfile = () => {
                     <div style={styles.headerInfo}>
                         <div style={styles.tag}>CONFIGURACIÓN DE CUENTA</div>
                         <h1 style={styles.title}>Editar Perfil</h1>
-                        <p style={styles.subtitle}>Gestiona tus datos personales y tu foto de perfil</p>
+                        <p style={styles.subtitle}>Gestiona tus datos personales, foto de perfil y seguridad</p>
                     </div>
                 </div>
 
@@ -248,6 +295,66 @@ const EditProfile = () => {
                             </div>
                         </div>
 
+                        {/* SECCIÓN DE CAMBIO DE CONTRASEÑA */}
+                        <div style={{ gridColumn: '1 / -1', marginTop: '10px' }}>
+                            <h3 style={styles.sectionTitle}>Seguridad y Contraseña</h3>
+                            <p style={styles.sectionSubtitle}>Deja estos campos en blanco si no deseas cambiar tu contraseña actual.</p>
+                        </div>
+
+                        {/* Contraseña Actual */}
+                        <div style={styles.inputGroup}>
+                            <label style={styles.label}>Contraseña Actual</label>
+                            <div style={styles.inputWrapper}>
+                                <svg style={styles.inputIcon} width="20" height="20" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.8" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+                                </svg>
+                                <input
+                                    type="password"
+                                    name="passwordActual"
+                                    value={formData.passwordActual}
+                                    onChange={handleChange}
+                                    placeholder="••••••••••••"
+                                    style={styles.input}
+                                />
+                            </div>
+                        </div>
+
+                        {/* Contraseña Nueva */}
+                        <div style={styles.inputGroup}>
+                            <label style={styles.label}>Nueva Contraseña</label>
+                            <div style={styles.inputWrapper}>
+                                <svg style={styles.inputIcon} width="20" height="20" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.8" d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z" />
+                                </svg>
+                                <input
+                                    type="password"
+                                    name="passwordNueva"
+                                    value={formData.passwordNueva}
+                                    onChange={handleChange}
+                                    placeholder="••••••••••••"
+                                    style={styles.input}
+                                />
+                            </div>
+                        </div>
+
+                        {/* Confirmar Contraseña Nueva */}
+                        <div style={{ ...styles.inputGroup, gridColumn: '1 / -1' }}>
+                            <label style={styles.label}>Confirmar Nueva Contraseña</label>
+                            <div style={styles.inputWrapper}>
+                                <svg style={styles.inputIcon} width="20" height="20" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.8" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
+                                </svg>
+                                <input
+                                    type="password"
+                                    name="passwordConfirmar"
+                                    value={formData.passwordConfirmar}
+                                    onChange={handleChange}
+                                    placeholder="Repite la nueva contraseña"
+                                    style={styles.input}
+                                />
+                            </div>
+                        </div>
+
                     </div>
 
                     {/* Botón Guardar */}
@@ -354,6 +461,17 @@ const styles = {
         height: '1px',
         backgroundColor: '#F1F5F9',
         margin: '32px 0 36px 0'
+    },
+    sectionTitle: {
+        fontSize: '18px',
+        fontWeight: '700',
+        color: '#0F172A',
+        margin: '12px 0 4px 0'
+    },
+    sectionSubtitle: {
+        fontSize: '13px',
+        color: '#64748B',
+        margin: '0 0 16px 0'
     },
     alert: {
         padding: '14px 20px',
