@@ -28,6 +28,7 @@ import TratamientoDeDatos from './pages/TratamientoDeDatos';
 import Envios from './pages/Envios';
 import Footer from './components/Footer';
 import MisCompras from './pages/MisCompras';
+import ActualizarPassword from './pages/ActualizarPassword';
 
 function App() {
   const [nuevoUsuario, setNuevoUsuario] = useState({ 
@@ -91,6 +92,8 @@ function App() {
             <Route path="/factura" element={<ConsultaFactura />} />
             <Route path="/carrito" element={<Carrito />} />
             <Route path="/mis-compras" element={<MisCompras />} />
+            <Route path="/actualizar-password" element={<ActualizarPassword />} />
+            
             <Route path="/login" element={
               <Login 
                 handleRegistro={handleRegistro} 
