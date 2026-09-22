@@ -27,6 +27,7 @@ import PoliticaDeCookies from './pages/PoliticaDeCookies';
 import TratamientoDeDatos from './pages/TratamientoDeDatos';
 import Envios from './pages/Envios';
 import Footer from './components/Footer';
+import MisCompras from './pages/MisCompras';
 
 function App() {
   const [nuevoUsuario, setNuevoUsuario] = useState({ 
@@ -89,6 +90,7 @@ function App() {
             <Route path="/envios" element={<Envios />} />
             <Route path="/factura" element={<ConsultaFactura />} />
             <Route path="/carrito" element={<Carrito />} />
+            <Route path="/mis-compras" element={<MisCompras />} />
             <Route path="/login" element={
               <Login 
                 handleRegistro={handleRegistro} 

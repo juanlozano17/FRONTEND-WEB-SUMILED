@@ -138,7 +138,7 @@ const Contact = ({ cambiarVista }) => {
             <div className="d-flex flex-column gap-3">
               <p><i className="bi bi-shop me-2"></i> Carrera: 7 # 54 25 Soacha</p>
               <p><i className="bi bi-whatsapp me-2"></i>3219065380</p>
-              <p><i className="bi bi-envelope-fill me-2"></i> contacto@sumiledsas.com</p>
+              <p><i className="bi bi-envelope-fill me-2"></i> contactosumiled@protonmail.com</p>
               <hr />
               <div className="mt-2">
                 <p className="fw-bold mb-1">Horario de atención</p>

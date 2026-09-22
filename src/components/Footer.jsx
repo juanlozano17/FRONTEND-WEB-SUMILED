@@ -19,7 +19,7 @@ const Footer = () => {
             <p className="text-muted small mb-3">018000 180222</p>
 
             <p className="mb-1 fw-semibold small">Consultas y solicitudes</p>
-            <p className="text-muted small mb-1">soporte@sumiledsas.com</p>
+            <p className="text-muted small mb-1">contactosumiled@protonmail.com</p>
             <ul className="list-unstyled small mb-3 ps-0">
               <li><Link to="/contacto" className="text-decoration-none text-muted">Formulario de contacto</Link></li>
               <li><Link to="/garantias" className="text-decoration-none text-muted">Preguntas frecuentes y garantías</Link></li>
@@ -83,7 +83,6 @@ const Footer = () => {
             <ul className="list-unstyled small d-flex flex-column gap-2 ps-0">
               <li><Link to="/medios-de-pago" className="text-decoration-none text-muted">Medios de pago</Link></li>
               <li><Link to="/cambios-y-devoluciones" className="text-decoration-none text-muted">Cambios y devoluciones</Link></li>
-              <li><Link to="/factura" className="text-decoration-none text-muted">Consulta tu factura</Link></li>
               <li><Link to="/envios" className="text-decoration-none text-muted">Envíos y cobertura</Link></li>
             </ul>
           </div>

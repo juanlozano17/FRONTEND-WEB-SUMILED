@@ -178,17 +178,18 @@ const Navbar = () => {
                 <i className="bi bi-person-circle fs-4"></i>
               )}
             </button>
-            <ul className="dropdown-menu dropdown-menu-end">
+            <ul className="dropdown-menu dropdown-menu-end shadow border-0 rounded-4 p-2" style={{ width: '220px' }}>
               {userName ? (
                 <>
-                  <li><h6 className="dropdown-header">Hola, {userName}</h6></li>
-                  {userRole == 1 && <li><Link className="dropdown-item" to="/dashboard">Panel Admin</Link></li>}
-                  <li><Link className="dropdown-item" to="/perfil">Editar Perfil</Link></li>
-                  <li><hr className="dropdown-divider" /></li>
-                  <li><button className="dropdown-item text-danger" onClick={handleLogout}>Cerrar sesión</button></li>
+                  <li><h6 className="dropdown-header text-truncate">Hola, {userName}</h6></li>
+                  {userRole == 1 && <li><Link className="dropdown-item rounded-3 py-2" to="/dashboard">Panel Admin</Link></li>}
+                  <li><Link className="dropdown-item rounded-3 py-2" to="/perfil">Editar Perfil</Link></li>
+                  <li><Link className="dropdown-item rounded-3 py-2 fw-semibold text-primary" to="/mis-compras">Mis Compras</Link></li>
+                  <li><hr className="dropdown-divider my-1" /></li>
+                  <li><button className="dropdown-item rounded-3 py-2 text-danger" onClick={handleLogout}>Cerrar sesión</button></li>
                 </>
               ) : (
-                <li><Link className="dropdown-item" to="/login">Iniciar sesión</Link></li>
+                <li><Link className="dropdown-item rounded-3 py-2" to="/login">Iniciar sesión</Link></li>
               )}
             </ul>
           </div>
