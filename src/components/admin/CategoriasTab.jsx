@@ -1,131 +1,355 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import { supabase } from '../../supabaseClient';
 
-const CategoriasTab = ({ categorias, setCategorias, cargando }) => {
-  const [esAgregandoCategoria, setEsAgregandoCategoria] = useState(false);
-  const [nuevaCategoria, setNuevaCategoria] = useState({ idcategoria: '', nombre: '' });
+const CategoriasTab = () => {
+  const [categorias, setCategorias] = useState([]);
+  const [cargando, setCargando] = useState(true);
+  const [nombreCategoria, setNombreCategoria] = useState('');
+  const [guardando, setGuardando] = useState(false);
+  const [errorMensaje, setErrorMensaje] = useState('');
+  const [exitoMensaje, setExitoMensaje] = useState('');
 
-  const eliminarCategoria = async (idcategoria) => {
-    if (!window.confirm("¿Estás seguro de eliminar esta categoría?")) return;
+  // Estados para el modal de Edición
+  const [modalEditarAbierto, setModalEditarAbierto] = useState(false);
+  const [categoriaActual, setCategoriaActual] = useState(null);
+  const [nombreEditado, setNombreEditado] = useState('');
+  const [editando, setEditando] = useState(false);
+
+  const cargarCategorias = async () => {
+    setCargando(true);
     try {
-      const response = await fetch(`http://localhost:3000/api/categorias/${idcategoria}`, {
-        method: 'DELETE',
+      const { data, error } = await supabase
+        .from('categorias')
+        .select('*');
+
+      if (error) throw error;
+
+      const categoriasOrdenadas = (data || []).sort((a, b) => {
+        const idA = Number(a.idcategoria || a.id || 0);
+        const idB = Number(b.idcategoria || b.id || 0);
+        return idA - idB;
       });
-      if (response.ok) {
-        setCategorias(categorias.filter(c => (c.idcategoria || c.id) !== idcategoria));
-      } else {
-        alert("Error al eliminar la categoría.");
-      }
-    } catch (error) {
-      console.error("Error al eliminar categoría:", error);
+
+      setCategorias(categoriasOrdenadas);
+    } catch (err) {
+      console.error("Error al cargar categorías:", err);
+    } finally {
+      setCargando(false);
     }
   };
 
-  const agregarCategoria = async (e) => {
+  useEffect(() => {
+    cargarCategorias();
+  }, []);
+
+  // Crear Categoría
+  const handleCrearCategoria = async (e) => {
     e.preventDefault();
-    const existe = categorias.some(c => String(c.idcategoria) === String(nuevaCategoria.idcategoria));
-    if (existe) {
-      alert("Ya existe una categoría registrada con ese ID.");
+    if (!nombreCategoria.trim()) {
+      setErrorMensaje('El nombre de la categoría no puede estar vacío.');
       return;
     }
+
+    setGuardando(true);
+    setErrorMensaje('');
+    setExitoMensaje('');
+
     try {
-      const response = await fetch('http://localhost:3000/api/categorias', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(nuevaCategoria)
-      });
-      if (response.ok) {
-        const data = await response.json();
-        setCategorias([...categorias, data]);
-        setEsAgregandoCategoria(false);
-        setNuevaCategoria({ idcategoria: '', nombre: '' });
-      } else {
-        alert("Error al registrar la categoría.");
-      }
-    } catch (error) {
-      console.error("Error al agregar categoría:", error);
+      const idsExistentes = categorias.map(c => Number(c.idcategoria || c.id || 0));
+      const siguienteId = idsExistentes.length > 0 ? Math.max(...idsExistentes) + 1 : 1;
+
+      const objetoInsert = { 
+        idcategoria: siguienteId, 
+        nombre: nombreCategoria.trim() 
+      };
+
+      const { error } = await supabase
+        .from('categorias')
+        .insert([objetoInsert]);
+
+      if (error) throw error;
+
+      setNombreCategoria('');
+      setExitoMensaje('¡Categoría creada con éxito!');
+      cargarCategorias();
+
+      setTimeout(() => setExitoMensaje(''), 4000);
+    } catch (err) {
+      console.error("Error al registrar la categoría:", err);
+      setErrorMensaje('Error al guardar: ' + (err.message || 'Error desconocido'));
+    } finally {
+      setGuardando(false);
+    }
+  };
+
+  // Abrir Modal de Edición
+  const abrirEdicion = (cat) => {
+    setCategoriaActual(cat);
+    setNombreEditado(cat.nombre || '');
+    setModalEditarAbierto(true);
+  };
+
+  // Guardar Cambios de Edición
+  const handleEditarCategoria = async (e) => {
+    e.preventDefault();
+    if (!nombreEditado.trim()) return;
+
+    setEditando(true);
+    try {
+      const idCat = categoriaActual.idcategoria || categoriaActual.id;
+      
+      const { error } = await supabase
+        .from('categorias')
+        .update({ nombre: nombreEditado.trim() })
+        .eq('idcategoria', idCat); // Ajusta a 'id' si tu columna se llama así en Supabase
+
+      if (error) throw error;
+
+      setModalEditarAbierto(false);
+      setExitoMensaje('¡Categoría actualizada correctamente!');
+      cargarCategorias();
+
+      setTimeout(() => setExitoMensaje(''), 4000);
+    } catch (err) {
+      console.error("Error al actualizar la categoría:", err);
+      alert('Error al actualizar: ' + (err.message || 'Error desconocido'));
+    } finally {
+      setEditando(false);
+    }
+  };
+
+  // Eliminar Categoría
+  const handleEliminarCategoria = async (cat) => {
+    const idCat = cat.idcategoria || cat.id;
+    const nombreCat = cat.nombre;
+
+    if (!window.confirm(`¿Estás seguro de que deseas eliminar la categoría "${nombreCat}"?`)) {
+      return;
+    }
+
+    try {
+      const { error } = await supabase
+        .from('categorias')
+        .delete()
+        .eq('idcategoria', idCat); // Ajusta a 'id' si tu columna se llama así en Supabase
+
+      if (error) throw error;
+
+      setExitoMensaje(`Categoría "${nombreCat}" eliminada con éxito.`);
+      cargarCategorias();
+
+      setTimeout(() => setExitoMensaje(''), 4000);
+    } catch (err) {
+      console.error("Error al eliminar la categoría:", err);
+      alert('No se pudo eliminar la categoría. Es posible que esté asociada a productos existentes.');
     }
   };
 
   return (
-    <div className="card border-0 shadow-sm rounded-4 p-4 bg-white">
-      <div className="d-flex justify-content-between align-items-center mb-2">
-        <div>
-          <h4 className="fw-bold mb-1 text-dark">Categorías de Productos</h4>
-          <p className="text-muted small mb-0">Cargado directamente desde la tabla `categoria` de tu base de datos.</p>
-        </div>
-        <button className="btn btn-dark rounded-pill px-3" onClick={() => setEsAgregandoCategoria(true)}>
-          <i className="bi bi-plus-lg me-1"></i> Nueva Categoría
-        </button>
-      </div>
-
-      <div className="table-responsive mt-3">
-        <table className="table table-hover align-middle">
-          <thead className="table-light">
-            <tr>
-              <th style={{ width: '25%' }}>ID Categoría</th>
-              <th style={{ width: '60%' }}>Nombre</th>
-              <th style={{ width: '15%' }} className="text-end">Acciones</th>
-            </tr>
-          </thead>
-          <tbody>
-            {cargando ? (
-              <tr><td colSpan="3" className="text-center py-4 text-muted">Cargando categorías...</td></tr>
-            ) : categorias.length > 0 ? (
-              categorias.map((cat) => (
-                <tr key={cat.idcategoria || cat.id}>
-                  <td className="fw-bold">#{cat.idcategoria || cat.id}</td>
-                  <td className="fw-medium text-dark">{cat.nombre}</td>
-                  <td className="text-end">
-                    <button className="btn btn-outline-danger btn-sm rounded-pill px-3" onClick={() => eliminarCategoria(cat.idcategoria || cat.id)}>
-                      <i className="bi bi-trash me-1"></i> Eliminar
-                    </button>
-                  </td>
-                </tr>
-              ))
-            ) : (
-              <tr><td colSpan="3" className="text-center py-4 text-muted">No hay categorías registradas...</td></tr>
-            )}
-          </tbody>
-        </table>
-      </div>
-
-      {/* MODAL: NUEVA CATEGORÍA */}
-      {esAgregandoCategoria && (
-        <div className="modal show d-block" style={{ backgroundColor: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(4px)' }}>
-          <div className="modal-dialog modal-dialog-centered">
-            <div className="modal-content border-0 shadow-lg rounded-4 p-4">
-              <h4 className="fw-bold mb-3">Registrar Nueva Categoría</h4>
-              <form onSubmit={agregarCategoria}>
-                <label className="small text-muted fw-bold">ID de Categoría (Número único)</label>
-                <input 
-                  className="form-control mb-3" 
-                  type="number" 
-                  required 
-                  placeholder="Ej. 5" 
-                  onChange={(e) => setNuevaCategoria({ ...nuevaCategoria, idcategoria: e.target.value })} 
-                  value={nuevaCategoria.idcategoria} 
-                />
-
-                <label className="small text-muted fw-bold">Nombre de la Categoría</label>
-                <input 
-                  className="form-control mb-4" 
-                  required 
-                  placeholder="Ej. Lámparas LED" 
-                  onChange={(e) => setNuevaCategoria({ ...nuevaCategoria, nombre: e.target.value })} 
-                  value={nuevaCategoria.nombre} 
-                />
-
-                <div className="d-grid gap-2">
-                  <button type="submit" className="btn btn-dark rounded-pill">Guardar</button>
-                  <button type="button" className="btn btn-light rounded-pill" onClick={() => setEsAgregandoCategoria(false)}>Cancelar</button>
-                </div>
-              </form>
+    <div className="row g-4">
+      
+      {/* Columna Izquierda: Formulario para Nueva Categoría */}
+      <div className="col-12 col-lg-4">
+        <div className="card border-0 shadow-sm rounded-4 p-4 bg-white sticky-top" style={{ top: '20px' }}>
+          
+          <div className="d-flex align-items-center gap-3 mb-3">
+            <div className="bg-dark bg-opacity-10 text-dark rounded-3 d-flex align-items-center justify-content-center" style={{ width: '45px', height: '45px', minWidth: '45px' }}>
+              <i className="bi bi-folder-plus fs-4"></i>
             </div>
+            <div>
+              <h5 className="fw-extrabold text-dark m-0">Nueva Categoría</h5>
+              <p className="text-muted small m-0">Añade registros a Supabase.</p>
+            </div>
+          </div>
+
+          {errorMensaje && (
+            <div className="alert alert-danger py-2 px-3 small rounded-3 mb-3 border-0 bg-danger bg-opacity-10 text-danger">
+              <i className="bi bi-exclamation-circle-fill me-1"></i> {errorMensaje}
+            </div>
+          )}
+
+          {exitoMensaje && (
+            <div className="alert alert-success py-2 px-3 small rounded-3 mb-3 border-0 bg-success bg-opacity-10 text-success">
+              <i className="bi bi-check-circle-fill me-1"></i> {exitoMensaje}
+            </div>
+          )}
+
+          <form onSubmit={handleCrearCategoria}>
+            <div className="mb-3">
+              <label className="form-label text-dark small fw-bold">Nombre de la Categoría</label>
+              <input 
+                type="text" 
+                className="form-control form-control-lg bg-light border-0 fs-6 shadow-none py-3 rounded-3" 
+                placeholder="Ej. Herramientas" 
+                value={nombreCategoria}
+                onChange={(e) => setNombreCategoria(e.target.value)}
+                required
+              />
+            </div>
+
+            <button 
+              type="submit" 
+              className="btn btn-dark w-100 py-3 rounded-pill fw-bold shadow-sm"
+              disabled={guardando}
+            >
+              {guardando ? (
+                <>
+                  <span className="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
+                  Sincronizando...
+                </>
+              ) : (
+                'Guardar Categoría'
+              )}
+            </button>
+          </form>
+
+        </div>
+      </div>
+
+      {/* Columna Derecha: Listado Completo con Acciones de Editar y Borrar */}
+      <div className="col-12 col-lg-8">
+        <div className="card border-0 shadow-sm rounded-4 p-4 bg-white">
+          
+          <div className="d-flex justify-content-between align-items-center mb-4 pb-3 border-bottom flex-wrap gap-3">
+            <div>
+              <h4 className="fw-extrabold text-dark mb-1">Listado de Categorías</h4>
+              <p className="text-muted small m-0">Administra, edita o elimina elementos en tiempo real.</p>
+            </div>
+            <button className="btn btn-outline-secondary btn-sm rounded-pill px-3 shadow-sm bg-white fw-semibold" onClick={cargarCategorias}>
+              <i className="bi bi-arrow-clockwise me-1"></i> Actualizar
+            </button>
+          </div>
+
+          <div className="table-responsive">
+            <table className="table table-hover align-middle">
+              <thead className="table-light text-uppercase fs-8 text-muted">
+                <tr>
+                  <th className="py-3 rounded-start ps-3" style={{ width: '100px' }}>ID</th>
+                  <th className="py-3">Nombre</th>
+                  <th className="py-3 text-end rounded-end pe-3" style={{ width: '180px' }}>Acciones</th>
+                </tr>
+              </thead>
+              <tbody>
+                {cargando ? (
+                  <tr>
+                    <td colSpan="3" className="text-center py-5 text-muted">
+                      <div className="spinner-border spinner-border-sm text-dark me-2" role="status"></div>
+                      Cargando categorías...
+                    </td>
+                  </tr>
+                ) : categorias.length > 0 ? (
+                  categorias.map((cat) => {
+                    const idCat = cat.idcategoria || cat.id;
+                    const nombreCat = cat.nombre || 'Sin nombre';
+
+                    return (
+                      <tr key={idCat}>
+                        <td className="ps-3 fw-bold text-muted">
+                          <span className="badge bg-light text-dark border px-3 py-2 rounded-pill">#{idCat}</span>
+                        </td>
+                        <td>
+                          <div className="d-flex align-items-center gap-3">
+                            <div className="bg-dark bg-opacity-10 text-dark rounded-circle d-flex align-items-center justify-content-center fw-bold" style={{ width: '35px', height: '35px', minWidth: '35px' }}>
+                              {nombreCat.charAt(0).toUpperCase()}
+                            </div>
+                            <span className="fw-semibold text-dark fs-6">{nombreCat}</span>
+                          </div>
+                        </td>
+                        <td className="text-end pe-3">
+                          <div className="d-flex justify-content-end gap-2">
+                            <button 
+                              className="btn btn-outline-dark btn-sm rounded-pill px-3 fw-semibold shadow-xs"
+                              onClick={() => abrirEdicion(cat)}
+                              title="Editar categoría"
+                            >
+                              <i className="bi bi-pencil-square"></i>
+                            </button>
+                            <button 
+                              className="btn btn-outline-danger btn-sm rounded-pill px-3 fw-semibold shadow-xs"
+                              onClick={() => handleEliminarCategoria(cat)}
+                              title="Eliminar categoría"
+                            >
+                              <i className="bi bi-trash-fill"></i>
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })
+                ) : (
+                  <tr>
+                    <td colSpan="3" className="text-center py-5 text-muted">
+                      No hay categorías registradas.
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+
+        </div>
+      </div>
+
+      {/* Modal de Edición (Fondo sólido sin blur para cero bugs o parpadeos) */}
+      {modalEditarAbierto && (
+        <div style={{ position: 'fixed', top: 0, left: 0, width: '100vw', height: '100vh', backgroundColor: 'rgba(15, 23, 42, 0.6)', zIndex: 99999, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px' }}>
+          <div className="bg-white rounded-4 shadow-lg w-100 p-4 position-relative border" style={{ maxWidth: '420px' }}>
+            
+            <button 
+              type="button" 
+              className="btn-close position-absolute top-0 end-0 m-4 shadow-none" 
+              onClick={() => setModalEditarAbierto(false)}
+            ></button>
+
+            <div className="mb-4 text-start">
+              <h4 className="fw-extrabold text-dark m-0 mb-1">Editar Categoría</h4>
+              <p className="text-muted small m-0">Modifica el nombre registrado en Supabase.</p>
+            </div>
+
+            <form onSubmit={handleEditarCategoria}>
+              <div className="mb-3">
+                <label className="form-label text-dark small fw-bold">Nuevo Nombre</label>
+                <input 
+                  type="text" 
+                  className="form-control form-control-lg bg-light border-0 fs-6 shadow-none py-3 rounded-3" 
+                  value={nombreEditado}
+                  onChange={(e) => setNombreEditado(e.target.value)}
+                  autoFocus
+                  required
+                />
+              </div>
+
+              <div className="d-flex flex-column gap-2 mt-4">
+                <button 
+                  type="submit" 
+                  className="btn btn-dark w-100 py-3 rounded-pill fw-bold shadow-sm"
+                  disabled={editando}
+                >
+                  {editando ? (
+                    <>
+                      <span className="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
+                      Actualizando...
+                    </>
+                  ) : (
+                    'Guardar Cambios'
+                  )}
+                </button>
+                <button 
+                  type="button" 
+                  className="btn btn-link text-muted text-decoration-none small py-2 fw-semibold"
+                  onClick={() => setModalEditarAbierto(false)}
+                >
+                  Cancelar
+                </button>
+              </div>
+            </form>
+
           </div>
         </div>
       )}
+
     </div>
   );
 };
 
-export default CategoriasTab;   
+export default CategoriasTab;
