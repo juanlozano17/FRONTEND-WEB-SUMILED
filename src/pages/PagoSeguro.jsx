@@ -33,6 +33,18 @@ const PagoSeguro = () => {
   useEffect(() => {
     const productosGuardados = JSON.parse(localStorage.getItem('carrito_pyp')) || [];
     setCarrito(productosGuardados);
+
+    // Precargar datos del usuario logueado si existe en el localStorage
+    const usuarioLogueado = JSON.parse(localStorage.getItem('usuarioLogueado') || localStorage.getItem('usuariologueado'));
+    if (usuarioLogueado) {
+      setFormData(prev => ({
+        ...prev,
+        nombre: `${usuarioLogueado.nombre || ''} ${usuarioLogueado.apellidos || ''}`.trim(),
+        email: usuarioLogueado.correo || '',
+        telefono: usuarioLogueado.telefono || '',
+        direccion: usuarioLogueado.direccion || ''
+      }));
+    }
   }, []);
 
   const totalPagar = carrito.reduce((acc, item) => {
@@ -41,6 +53,7 @@ const PagoSeguro = () => {
     return acc + (precioNum * cantidadNum);
   }, 0);
 
+  // 🚚 LÓGICA DE ENVÍO: Si la compra es mayor a $100.000 es GRATIS, de lo contrario cuesta $10.000
   const costoEnvio = totalPagar === 0 ? 0 : (totalPagar > 100000 ? 0 : 10000);
   const totalGeneral = totalPagar + costoEnvio;
 
@@ -65,14 +78,14 @@ const PagoSeguro = () => {
             body { font-family: Arial, sans-serif; padding: 30px; color: #333; }
             .header { text-align: center; border-bottom: 2px solid #333; padding-bottom: 15px; margin-bottom: 20px; position: relative; }
             .check-circle {
-              width: 50px; height: 50px; background-color: #198754; color: white;
+              width: 50px; height: 50px; background-color: #ffc107; color: #000;
               border-radius: 50%; display: flex; align-items: center; justify-content: center;
               font-size: 28px; margin: 0 auto 10px auto; line-height: 50px; text-align: center;
             }
-            .sello-pagado {
-              position: absolute; top: 0; right: 0; border: 3px solid #198754; color: #198754;
+            .sello-pendiente {
+              position: absolute; top: 0; right: 0; border: 3px solid #ffc107; color: #b78103;
               padding: 5px 15px; font-weight: bold; font-size: 16px; transform: rotate(10deg);
-              border-radius: 5px; text-transform: uppercase; letter-spacing: 2px;
+              border-radius: 5px; text-transform: uppercase; letter-spacing: 2px; background-color: #fff3cd;
             }
             .info { margin-bottom: 20px; }
             table { width: 100%; border-collapse: collapse; margin-bottom: 20px; }
@@ -84,17 +97,19 @@ const PagoSeguro = () => {
         </head>
         <body>
           <div class="header">
-            <div class="sello-pagado">PAGADO / OK</div>
-            <div class="check-circle">&#10003;</div>
+            <div class="sello-pendiente">PENDIENTE</div>
+            <div class="check-circle">&#8987;</div>
             <h2>SUMILED SAS</h2>
             <p>NIT: 900.123.456-1 | Bogotá D.C., Colombia</p>
-            <h3>Comprobante de Venta #${compra.idVenta}</h3>
+            <h3>Pedido / Venta #${compra.idVenta}</h3>
           </div>
           <div class="info">
             <p><strong>Cliente:</strong> ${compra.nombre}</p>
+            <p><strong>Correo:</strong> ${compra.email || 'No especificado'}</p>
             <p><strong>Teléfono:</strong> ${compra.telefono}</p>
-            <p><strong>Dirección:</strong> ${compra.direccion} (${compra.ciudad})</p>
+            <p><strong>Dirección de Entrega:</strong> ${compra.direccion} (${compra.ciudad})</p>
             <p><strong>Método de Pago:</strong> ${compra.metodoPago.toUpperCase()}</p>
+            <p><strong>Estado del Pedido:</strong> Pendiente de Verificación / Despacho</p>
             <p><strong>Fecha:</strong> ${new Date().toLocaleString()}</p>
           </div>
           <table>
@@ -109,10 +124,9 @@ const PagoSeguro = () => {
             <tbody>
               ${compra.productos.map(item => `
                 <tr>
-                  <td>${item.nombre}</td>
+                  <td>${item.nombre || item.titulo || 'Producto'}</td>
                   <td>${item.cantidad}</td>
-                  <td>$${parsePrecio(item).toLocaleString()}</td>
-                  <td>$${(parsePrecio(item) * (item.cantidad || 1)).toLocaleString()}</td>
+                  <td>$${parsePrecio(item).toLocaleString()}</td>                   <td>$${(parsePrecio(item) * (item.cantidad || 1)).toLocaleString()}</td>
                 </tr>
               `).join('')}
             </tbody>
@@ -123,7 +137,7 @@ const PagoSeguro = () => {
             <p>Total General: $${compra.totalGeneral.toLocaleString()}</p>
           </div>
           <div class="footer">
-            <p>¡Gracias por tu compra en SUMILED SAS!</p>
+            <p>¡Gracias por tu compra en SUMILED SAS! Tu pedido está siendo procesado.</p>
           </div>
           <script>
             window.onload = function() { window.print(); }
@@ -136,50 +150,20 @@ const PagoSeguro = () => {
 
   const procesarGuardadoVenta = async (metodo) => {
     try {
-      const mapeoMediosPago = {
-        'nequi': 1,
-        'daviplata': 2,
-        'bancolombia': 3,
-        'pse': 4,
-        'contraentrega': 5
-      };
-      const idMedioPagoNum = mapeoMediosPago[metodo] || 1;
-
-      const partesNombre = formData.nombre.trim().split(' ');
-      const primerNombre = partesNombre[0] || 'Cliente';
-      const apellidoCliente = partesNombre.slice(1).join(' ') || 'General';
-
-      // 1. Insertar cliente asegurando enviar solo columnas seguras para evitar errores de esquema
-      const datosClienteInsert = {
-        nombre: primerNombre,
-        apellido: apellidoCliente,
-        telefono: formData.telefono
+      // Guardado directo mapeado con las columnas reales de tu tabla 'venta'
+      const datosVentaInsert = {
+        cliente: formData.nombre,
+        correo: formData.email,
+        telefono: formData.telefono,
+        direccion: `${formData.direccion} (${formData.ciudad})`,
+        total: totalGeneral,
+        estado: 'pendiente',
+        fecha_pedido: new Date().toISOString()
       };
 
-      const { data: clienteData, error: clienteError } = await supabase
-        .from('cliente')
-        .insert([datosClienteInsert])
-        .select()
-        .single();
-
-      if (clienteError) {
-        console.error("Error al registrar cliente:", clienteError);
-        alert("Hubo un error al registrar los datos del cliente en Supabase: " + clienteError.message);
-        return null;
-      }
-
-      const clienteId = clienteData?.idcliente || clienteData?.id;
-
-      // 2. Insertar venta principal
       const { data: ventaData, error: ventaError } = await supabase
         .from('venta')
-        .insert([{
-          idmedio_pago: idMedioPagoNum,
-          idcliente: clienteId,
-          fecha_pedido: new Date().toISOString(),
-          total: totalGeneral,
-          estado: 'completado'
-        }])
+        .insert([datosVentaInsert])
         .select()
         .single();
 
@@ -189,14 +173,16 @@ const PagoSeguro = () => {
         return null;
       }
 
-      const ventaId = ventaData?.idventa || ventaData?.id;
+      const ventaId = ventaData?.idventa;
 
-      // 3. Insertar detalles de venta
+      // Insertar los detalles de los productos comprados en la tabla 'detalle_venta'
       const detallesInserts = carrito.map(item => ({
         idventa: ventaId,
-        idproducto: item.id || null,
+        idproducto: item.idproducto || item.id || null,
+        nombre_producto: item.nombre || item.titulo || 'Producto',
         cantidad: Number(item.cantidad) || 1,
-        precio_unitario: parsePrecio(item)
+        precio_unitario: parsePrecio(item),
+        subtotal: parsePrecio(item) * (Number(item.cantidad) || 1)
       }));
 
       const { error: detalleError } = await supabase
@@ -221,7 +207,7 @@ const PagoSeguro = () => {
       return resumenCompra;
 
     } catch (err) {
-      console.error("Error inesperado:", err);
+      console.error("Error inesperado en la transacción de compra:", err);
       return null;
     }
   };
@@ -273,30 +259,38 @@ const PagoSeguro = () => {
         <div className="card border-0 shadow-lg rounded-4 p-5 text-center bg-white" style={{ maxWidth: '600px', width: '100%' }}>
           
           <div className="mb-3">
-            <div className="bg-success text-white rounded-circle d-inline-flex align-items-center justify-content-center shadow-sm" style={{ width: '80px', height: '80px', fontSize: '40px' }}>
-              &#10003;
+            <div className="bg-warning text-dark rounded-circle d-inline-flex align-items-center justify-content-center shadow-sm" style={{ width: '80px', height: '80px', fontSize: '35px' }}>
+              &#8987;
             </div>
           </div>
 
-          <span className="badge bg-success-subtle text-success fw-bold px-3 py-1 rounded-pill mb-2 align-self-center">¡Transacción Exitosa!</span>
+          <span className="badge bg-warning-subtle text-warning fw-bold px-3 py-1 rounded-pill mb-2 align-self-center">¡Pedido Registrado con Éxito!</span>
           <h2 className="fw-bold text-dark mb-1">¡Gracias por tu compra, {datosCompraFinal.nombre}!</h2>
-          <p className="text-muted small mb-4">Tu pedido ha sido registrado correctamente en nuestro sistema y está siendo procesado.</p>
+          <p className="text-muted small mb-4">Tu pedido ha sido registrado correctamente y se encuentra en estado <strong>pendiente</strong> para revisión y despacho.</p>
 
           <div className="bg-light p-4 rounded-4 mb-4 text-start border">
             <div className="d-flex justify-content-between mb-2">
-              <span className="text-muted small">Número de Factura / Venta:</span>
+              <span className="text-muted small">Número de Pedido:</span>
               <span className="fw-bold text-dark">#{datosCompraFinal.idVenta}</span>
+            </div>
+            <div className="d-flex justify-content-between mb-2">
+              <span className="text-muted small">Estado Actual:</span>
+              <span className="badge bg-warning text-dark fw-bold">Pendiente</span>
             </div>
             <div className="d-flex justify-content-between mb-2">
               <span className="text-muted small">Método de Pago:</span>
               <span className="fw-semibold text-uppercase text-dark">{datosCompraFinal.metodoPago}</span>
             </div>
             <div className="d-flex justify-content-between mb-2">
+              <span className="text-muted small">Teléfono de Contacto:</span>
+              <span className="fw-semibold text-dark">{datosCompraFinal.telefono}</span>
+            </div>
+            <div className="d-flex justify-content-between mb-2">
               <span className="text-muted small">Dirección de Entrega:</span>
               <span className="fw-semibold text-dark text-end" style={{ maxWidth: '250px' }}>{datosCompraFinal.direccion} ({datosCompraFinal.ciudad})</span>
             </div>
             <div className="d-flex justify-content-between border-top pt-2 mt-2">
-              <span className="fw-bold text-dark">Total Cancelado:</span>
+              <span className="fw-bold text-dark">Total del Pedido:</span>
               <span className="fw-bold text-success fs-5">${datosCompraFinal.totalGeneral.toLocaleString()}</span>
             </div>
           </div>
@@ -361,9 +355,9 @@ const PagoSeguro = () => {
 
           {procesandoPago ? (
             <div className="py-4">
-              <div className="spinner-border text-success mb-3" role="status" style={{ width: '3rem', height: '3rem' }}></div>
-              <h6 className="fw-bold text-dark">Procesando pago seguro...</h6>
-              <p className="text-muted small m-0">Guardando venta en la base de datos...</p>
+              <div className="spinner-border text-warning mb-3" role="status" style={{ width: '3rem', height: '3rem' }}></div>
+              <h6 className="fw-bold text-dark">Procesando pago simulado...</h6>
+              <p className="text-muted small m-0">Registrando pedido pendiente en Supabase...</p>
             </div>
           ) : (
             <div className="d-flex flex-column gap-2">
@@ -579,11 +573,11 @@ const PagoSeguro = () => {
                 <h5 className="fw-bold text-dark mb-4">Resumen del Pedido</h5>
 
                 <div className="d-flex flex-column gap-3 mb-4 pb-3 border-bottom" style={{ maxHeight: '280px', overflowY: 'auto' }}>
-                  {carrito.map((item) => {
+                  {carrito.map((item, index) => {
                     const precioItemNum = parsePrecio(item);
                     const cantidadItem = Number(item.cantidad) || 1;
                     return (
-                      <div key={item.id} className="d-flex align-items-center justify-content-between">
+                      <div key={item.id || index} className="d-flex align-items-center justify-content-between">
                         <div className="d-flex align-items-center gap-3">
                           <img src={item.imagen} alt={item.nombre} className="rounded-3 object-fit-cover" style={{ width: '45px', height: '45px' }} />
                           <div>
@@ -602,7 +596,7 @@ const PagoSeguro = () => {
                   <span className="fw-semibold text-dark">${totalPagar.toLocaleString()}</span>
                 </div>
                 <div className="d-flex justify-content-between mb-3 text-muted border-bottom pb-3">
-                  <span>Envío</span>
+                  <span>Envío {totalPagar > 100000 && <span className="badge bg-success-subtle text-success ms-1">¡Gratis por compras &gt; $100k!</span>}</span>
                   {costoEnvio === 0 ? <span className="text-success fw-bold">Gratis</span> : <span className="fw-semibold text-dark">${costoEnvio.toLocaleString()}</span>}
                 </div>
 
@@ -612,9 +606,9 @@ const PagoSeguro = () => {
                 </div>
 
                 {procesandoPago ? (
-                  <button type="button" className="btn btn-success w-100 py-3 rounded-pill fw-bold shadow-sm" disabled>
+                  <button type="button" className="btn btn-warning w-100 py-3 rounded-pill fw-bold shadow-sm text-dark" disabled>
                     <span className="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
-                    Registrando pedido...
+                    Registrando pedido pendiente...
                   </button>
                 ) : (
                   <button type="submit" className="btn btn-dark w-100 py-3 rounded-pill fw-bold shadow-sm">
